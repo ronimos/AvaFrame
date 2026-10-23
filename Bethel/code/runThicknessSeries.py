@@ -152,7 +152,8 @@ def frictionParagraph(info, dc, th, auto, friction):
  ran every depth with both <code>samosATMedium</code> and <code>samosAT</code>. """
                 + ("Whether the flow reached or crossed the road was the same under both classes at every depth tested; " if same else
                    "Whether the flow reached or crossed the road differed between the classes for at least one depth; ")
-                + f"the peak pressure on the road differed by up to a factor of {rat:.2f}. The test did not include every depth shown above.</p>")
+                + f"the peak pressure on the road differed by up to a factor of {rat:.2f}."
+                + ("" if set(th) <= set(pm.index) else " The test did not include every depth shown above.") + "</p>")
     return txt
 
 

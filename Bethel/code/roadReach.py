@@ -20,7 +20,7 @@ from shapely.geometry import Polygon
 
 import bethel as b
 
-THICK = [0.75, 1.0, 1.5, 2.0]
+THICK = [0.5, 0.75, 1.0, 1.5, 2.0]
 FRICT = ["samosATMedium", "samosAT"]
 RHO = 300
 
