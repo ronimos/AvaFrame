@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "Road - hill side",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::26913" } },
+"features": [
+{"type":"Feature","properties":{"id":null,"Name":"Road - hill side","description":null,"timestamp":null,"begin":null,"end":null,"altitudeMode":null,"tessellate":1,"extrude":0,"visibility":-1,"drawOrder":null,"icon":null},"geometry":{"type":"LineString","coordinates":[[425603.60609832208138,4394767.121967348270118,0.0],[425702.069151221949141,4394833.31956822425127,0.0],[425821.617803792119958,4394914.26778490934521,0.0],[425902.933975668740459,4394960.877847607247531,0.0]]}}
+]
+}

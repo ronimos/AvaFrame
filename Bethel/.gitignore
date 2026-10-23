@@ -1,0 +1,7 @@
+# generated
+runs/
+Outputs/
+Inputs/remeshedRasters/
+# large rasters: re-create Inputs/Bethel_DEM.asc with code/prepInputs.py from the source DEM
+Inputs/Bethel_DEM.asc
+data/DEM/

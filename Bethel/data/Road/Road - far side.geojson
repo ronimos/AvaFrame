@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "Road - far side",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::26913" } },
+"features": [
+{"type":"Feature","properties":{"id":null,"Name":"Road - far side","description":null,"timestamp":null,"begin":null,"end":null,"altitudeMode":null,"tessellate":1,"extrude":0,"visibility":-1,"drawOrder":null,"icon":null},"geometry":{"type":"LineString","coordinates":[[425631.101640200766269,4394739.279758062213659,0.0],[425671.171801871911157,4394766.575950848869979,0.0],[425750.493129642389249,4394821.697432213462889,0.0],[425885.480291942716576,4394909.191488711163402,0.0],[425945.6063629911514,4394937.502869582735002,0.0]]}}
+]
+}

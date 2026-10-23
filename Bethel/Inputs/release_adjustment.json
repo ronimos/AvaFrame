@@ -1,0 +1,11 @@
+{
+ "minSlopeDeg": 28.0,
+ "nBelowCells": 3,
+ "blockCellM": 5,
+ "slopeSmoothingCells": 3,
+ "simplifyM": 5,
+ "areaOriginalHa": 4.7198261730758375,
+ "areaAdjustedHa": 4.91875,
+ "addedHa": 0.4173111434174767,
+ "removedHa": 0.21838731649331458
+}

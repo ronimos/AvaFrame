@@ -1,0 +1,128 @@
+"""Run com1DFA with saved time steps for several release thicknesses and animate them side by side.
+
+Layout: one column per release thickness; top row flow thickness, bottom row flow velocity, shared colour scales and a
+shared clock (a run that has stopped holds its last frame). Each thickness runs in its own avalanche dir
+Bethel/runs/anim_<friction>/th_<t>/.
+
+Usage (from /home/ron/AvaFrame):
+    uv run python Bethel/code/makeAnimationSeries.py                          # run all + render (samosATAuto, rho 300)
+    uv run python Bethel/code/makeAnimationSeries.py --render-only            # reuse existing runs
+    uv run python Bethel/code/makeAnimationSeries.py --friction samosATSmall --thickness 1 2 --dt 1
+Writes frames (PNG), flow.gif and, if ffmpeg is installed, flow.mp4 and flow.webm to Bethel/Outputs/animation_<friction>/.
+"""
+import argparse
+import re
+import shutil
+import subprocess
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+
+import bethel as b
+
+thr = 0.05  # m, flow thickness shown above this
+
+
+def runOne(avaDir, relTh, rho, friction, dt):
+    """com1DFA with flow fields saved every dt seconds, so the animation has time steps."""
+    b.runCom1DFA(avaDir, dict(rho=rho, frictModel=friction, relThFromFile=False, relTh=relTh,
+                              resType="ppr|pft|pfv|FT|FV", tSteps=f"0:{dt}"))
+    print(f"relTh {relTh} m done")
+
+
+def loadRun(avaDir):
+    """Time-step rasters of one run: {t: (FT, FV)}, plus the friction model AvaFrame actually used."""
+    steps = avaDir / "Outputs/com1DFA/peakFiles/timeSteps"
+    data = {}
+    for p in steps.glob("*_dfa_FT_t*.asc"):
+        t = float(re.search(r"_t([\d.]+)\.asc$", p.name).group(1))
+        ft, T, B = b.readRaster(p)
+        fv = b.readRaster(steps / p.name.replace("_FT_", "_FV_"))[0]
+        data[t] = (ft, fv)
+    return data, b.runConfig(avaDir)["GENERAL"]["frictModel"], T, B
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--thickness", type=float, nargs="+", default=[0.5, 0.75, 1.0, 1.5, 2.0])
+    ap.add_argument("--rho", type=float, default=300)
+    ap.add_argument("--friction", default="samosATAuto")
+    ap.add_argument("--dt", type=float, default=2, help="seconds between saved frames")
+    ap.add_argument("--fps", type=int, default=6)
+    ap.add_argument("--render-only", action="store_true")
+    ap.add_argument("--skip-existing", action="store_true", help="only run thicknesses without saved time steps")
+    a = ap.parse_args()
+    root = b.RUNS / f"anim_{a.friction}"
+    outDir = b.OUTPUTS / f"animation_{a.friction}"
+    dirs = {t: root / f"th_{t:g}" for t in a.thickness}
+
+    if not a.render_only:
+        for t, d in dirs.items():
+            if a.skip_existing and any((d / "Outputs/com1DFA/peakFiles/timeSteps").glob("*.asc")):
+                print(f"relTh {t:g} m: existing run kept")
+                continue
+            runOne(d, f"{t:g}", f"{a.rho:g}", a.friction, f"{a.dt:g}")
+
+    runs = {t: loadRun(d) for t, d in dirs.items()}
+    T, B = runs[a.thickness[0]][2:]
+    ext = b.extent(B)
+    for t in a.thickness:
+        print(f"relTh {t:g} m: friction used = {runs[t][1]}, {len(runs[t][0])} steps, ends at {max(runs[t][0]):.1f} s")
+    clock = sorted(set(x for r in runs.values() for x in r[0]))
+    vmaxT = max(np.nanmax(ft) for r in runs.values() for ft, _ in r[0].values())
+    vmaxV = max(np.nanmax(fv) for r in runs.values() for _, fv in r[0].values())
+
+    terrain = b.loadTerrain()
+    rel, hill, dExt = terrain["rel"], terrain["hill"], terrain["ext"]
+    anyF = [ft > thr for r in runs.values() for ft, _ in r[0].values()]
+    xl, yl = b.zoomWindow(anyF, T, rel, pad=100)
+    anyF = np.any(anyF, axis=0)
+
+    outDir.mkdir(parents=True, exist_ok=True)
+    for old in outDir.glob("frame_*.png"):
+        old.unlink()
+    n = len(a.thickness)
+    fig, axs = plt.subplots(2, n, figsize=(4.6 * n + 1.5, 10.5), constrained_layout=True, squeeze=False)
+    ims = {}
+    for j, t in enumerate(a.thickness):
+        for i, (nm, vmax, unit) in enumerate([("Flow thickness", vmaxT, "m"), ("Flow velocity", vmaxV, "m/s")]):
+            ax = axs[i, j]
+            ax.imshow(hill, cmap="gray", extent=dExt, alpha=.8)
+            ims[i, j] = ax.imshow(np.full(anyF.shape, np.nan), cmap="Blues", vmin=0, vmax=vmax, extent=ext)
+            rel.boundary.plot(ax=ax, color="#d95f02", lw=1.2)
+            ax.set_xlim(xl); ax.set_ylim(yl); ax.set_aspect("equal"); ax.tick_params(labelsize=6)
+            ax.ticklabel_format(style="plain", useOffset=False)
+            ax.set_title(f"{nm} - release {t:g} m" + (f"\n({runs[t][1]})" if i == 0 else ""), loc="left", fontsize=9)
+            if j == n - 1:
+                fig.colorbar(ims[i, j], ax=axs[i, :].tolist(), shrink=.7, pad=.01, label=unit)
+    title = fig.suptitle("")
+    frames = []
+    for k, tc in enumerate(clock):
+        for j, t in enumerate(a.thickness):
+            data = runs[t][0]
+            ts = max(x for x in data if x <= tc)  # hold last saved step (and final state once stopped)
+            ft, fv = data[ts]; m = ft > thr
+            ims[0, j].set_data(np.where(m, ft, np.nan)); ims[1, j].set_data(np.where(m, fv, np.nan))
+        title.set_text(f"Bethel avalanche, density {a.rho:g} kg/m3, t = {tc:5.1f} s")
+        f = outDir / f"frame_{k:03d}_t{tc:06.1f}s.png"
+        fig.savefig(f, dpi=70); frames.append(f)
+    imgs = [Image.open(f).convert("P", palette=Image.ADAPTIVE) for f in frames]
+    dur = [int(1000 / a.fps)] * len(imgs); dur[-1] = 2500
+    imgs[0].save(outDir / "flow.gif", save_all=True, append_images=imgs[1:], duration=dur, loop=0, optimize=True)
+    print(f"{len(frames)} frames -> {outDir}\ngif: {outDir / 'flow.gif'} ({(outDir / 'flow.gif').stat().st_size / 1e6:.1f} MB)")
+    if shutil.which("ffmpeg"):
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", str(a.fps), "-pattern_type", "glob", "-i",
+                        str(outDir / "frame_*.png"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p",
+                        str(outDir / "flow.mp4")], check=True)
+        print("mp4:", outDir / "flow.mp4")
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", str(a.fps), "-pattern_type", "glob", "-i",
+                        str(outDir / "frame_*.png"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libvpx-vp9", "-crf", "34", "-b:v", "0",
+                        str(outDir / "flow.webm")], check=False)  # webm plays in browsers without H.264
+        print("webm:", outDir / "flow.webm")
+
+
+if __name__ == "__main__":
+    main()
