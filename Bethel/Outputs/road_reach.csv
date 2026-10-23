@@ -1,0 +1,9 @@
+friction,relTh_m,reachesRoad,crossesRoad,gapToRoad_m,roadAreaHit_m2,maxPFT_onRoad_m,maxPFV_onRoad_ms,maxPPR_onRoad_kPa,volume_m3
+samosATMedium,0.75,False,False,9,0,0.0,0.0,0,46685
+samosATMedium,1.0,True,False,0,1650,1.93,9.8,29,62132
+samosATMedium,1.5,True,True,0,7825,3.55,21.0,132,93148
+samosATMedium,2.0,True,True,0,8800,4.88,26.6,212,124270
+samosAT,0.75,False,False,5,0,0.01,1.4,1,46685
+samosAT,1.0,True,False,0,2425,2.88,11.0,36,62132
+samosAT,1.5,True,True,0,8050,3.67,22.4,150,93148
+samosAT,2.0,True,True,0,8525,5.09,28.4,242,124270
