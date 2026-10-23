@@ -45,6 +45,7 @@ dependencies = [
     "geopandas",
     "fiona",
     "scikit-learn",
+    "plotly>=7.1.0",
 ]
 
 [project.optional-dependencies]
