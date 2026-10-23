@@ -20,8 +20,11 @@ from shapely.geometry import Polygon
 
 import bethel as b
 
+# Scenario matrix: release thicknesses [m] x friction classes. Fixed classes (not samosATAuto) so the matrix
+# shows how sensitive the road result is to friction.
 THICK = [0.5, 0.75, 1.0, 1.5, 2.0]
 FRICT = ["samosATMedium", "samosAT"]
+# snow density [kg/m3], also used to turn the simulated release mass into a volume
 RHO = 300
 
 
@@ -36,33 +39,41 @@ def main():
     ap.add_argument("--thr", type=float, default=0.1, help="peak flow thickness [m] counted as 'flow'")
     a = ap.parse_args()
 
+    # 1) simulations: one avalanche dir per (friction, thickness) under runs/road_<friction>/
     if not a.render_only:
         for fr in FRICT:
             for t in THICK:
                 b.runCom1DFA(runDir(fr, t), dict(rho=RHO, frictModel=fr, relThFromFile=False, relTh=f"{t:g}"))
                 print(f"{fr}, relTh {t:g} m done")
 
+    # 2) road geometry: the two edge lines (hill side / far side) and the strip between them, in the DEM's CRS.
+    # The lines may carry a Z value, so the strip polygon is rebuilt with 2D coordinates only.
     hillL = gpd.read_file(next((b.DATA / "Road").glob("*hill*.geojson"))).to_crs(b.CRS).geometry.iloc[0]
     farL = gpd.read_file(next((b.DATA / "Road").glob("*far*.geojson"))).to_crs(b.CRS).geometry.iloc[0]
     strip = Polygon(list(hillL.coords)[:] + list(farL.coords)[::-1])
     strip = Polygon([(x, y) for x, y, *_ in strip.exterior.coords]).buffer(0)
 
+    # 3) rasterise the lines/strip onto the simulation grid (all_touched so thin lines still hit cells)
     first, T, B = b.peakRaster(runDir(FRICT[0], THICK[0]), "pft")
     shape = first.shape
     cell = abs(T.a)
     rast = lambda g, touch: rasterize([g], out_shape=shape, transform=T, all_touched=touch).astype(bool)
     mHill, mFar, mStrip = rast(hillL, True), rast(farL, True), rast(strip, True)
     rows, res = [], {}
+    # cell-centre coordinates, used for the distance to the road when the flow stops short
     rr, cc = np.mgrid[0:shape[0], 0:shape[1]]
     X, Y = T * (cc + .5, rr + .5)
     for fr in FRICT:
         for t in THICK:
             d = runDir(fr, t)
             pft, pfv, ppr = (b.peakRaster(d, f)[0] for f in ("pft", "pfv", "ppr"))
+            # kept for the map matrix below
             res[fr, t] = pft
+            # 'flow' = cells whose peak flow thickness exceeds --thr
             flow = pft > a.thr
             reaches, crosses = bool((flow & mHill).any()), bool((flow & mFar).any())
             onRoad = flow & mStrip
+            # gap to the road: 0 if the flow touches the hill-side edge, otherwise the distance [m] from the nearest flow cell
             if reaches:
                 gap = 0.0
             else:  # distance from the nearest flow cell to the hill-side edge
@@ -72,12 +83,14 @@ def main():
                              maxPFV_onRoad_ms=round(float(np.nanmax(np.where(mStrip, pfv, np.nan))), 1),
                              maxPPR_onRoad_kPa=round(float(np.nanmax(np.where(mStrip, ppr, np.nan)))),
                              volume_m3=round(b.releaseMass(d) / RHO)))
+    # 4) results table (csv + printed)
     df = pd.DataFrame(rows)
     df.to_csv(b.OUTPUTS / "road_reach.csv", index=False)
     print(f"flow = peak thickness > {a.thr} m; road = strip between the two edge lines\n")
     print(df.to_string(index=False))
 
     # map matrix zoomed on the road
+    # 5) map matrix, zoomed on the road; xl/yl are Bethel-specific map limits (EPSG:26913 easting/northing)
     terrain = b.loadTerrain()
     rel, hill, dExt, ext = terrain["rel"], terrain["hill"], terrain["ext"], b.extent(B)
     xl, yl = (425250, 426050), (4394500, 4395250)

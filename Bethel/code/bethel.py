@@ -26,6 +26,7 @@ RUNS = BASE / "runs"
 OUTPUTS = BASE / "Outputs"
 RELEASE = INPUTS / "REL/Bethel_W_Start_Zone.shp"
 DEM = INPUTS / "Bethel_DEM.asc"
+# EPSG code of the DEM / release / road data (UTM 13N). Change for another site.
 CRS = 26913
 
 

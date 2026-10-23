@@ -55,10 +55,12 @@ def main():
     ap.add_argument("--render-only", action="store_true")
     ap.add_argument("--skip-existing", action="store_true", help="only run thicknesses without saved time steps")
     a = ap.parse_args()
+    # one avalanche dir per thickness: runs/anim_<friction>/th_<t>
     root = b.RUNS / f"anim_{a.friction}"
     outDir = b.OUTPUTS / f"animation_{a.friction}"
     dirs = {t: root / f"th_{t:g}" for t in a.thickness}
 
+    # run the simulations (skippable), then render from whatever is in runs/
     if not a.render_only:
         for t, d in dirs.items():
             if a.skip_existing and any((d / "Outputs/com1DFA/peakFiles/timeSteps").glob("*.asc")):
@@ -66,21 +68,26 @@ def main():
                 continue
             runOne(d, f"{t:g}", f"{a.rho:g}", a.friction, f"{a.dt:g}")
 
+    # load all runs: {thickness: (time steps, friction class used, transform, bounds)}; all runs share one grid
     runs = {t: loadRun(d) for t, d in dirs.items()}
     T, B = runs[a.thickness[0]][2:]
     ext = b.extent(B)
     for t in a.thickness:
         print(f"relTh {t:g} m: friction used = {runs[t][1]}, {len(runs[t][0])} steps, ends at {max(runs[t][0]):.1f} s")
+    # shared clock = union of all saved times; colour scales (max over all runs/steps) are fixed so frames are comparable
     clock = sorted(set(x for r in runs.values() for x in r[0]))
     vmaxT = max(np.nanmax(ft) for r in runs.values() for ft, _ in r[0].values())
     vmaxV = max(np.nanmax(fv) for r in runs.values() for _, fv in r[0].values())
 
+    # fixed map window around everything the flow ever covers + the release area
     terrain = b.loadTerrain()
     rel, hill, dExt = terrain["rel"], terrain["hill"], terrain["ext"]
     anyF = [ft > thr for r in runs.values() for ft, _ in r[0].values()]
     xl, yl = b.zoomWindow(anyF, T, rel, pad=100)
     anyF = np.any(anyF, axis=0)
 
+    # figure with one column per thickness (top: flow thickness, bottom: velocity). The artists are created once
+    # and only their data is swapped per frame, which is much faster than redrawing.
     outDir.mkdir(parents=True, exist_ok=True)
     for old in outDir.glob("frame_*.png"):
         old.unlink()
@@ -98,6 +105,7 @@ def main():
             ax.set_title(f"{nm} - release {t:g} m" + (f"\n({runs[t][1]})" if i == 0 else ""), loc="left", fontsize=9)
             if j == n - 1:
                 fig.colorbar(ims[i, j], ax=axs[i, :].tolist(), shrink=.7, pad=.01, label=unit)
+    # render one PNG per time step
     title = fig.suptitle("")
     frames = []
     for k, tc in enumerate(clock):
@@ -109,10 +117,12 @@ def main():
         title.set_text(f"Bethel avalanche, density {a.rho:g} kg/m3, t = {tc:5.1f} s")
         f = outDir / f"frame_{k:03d}_t{tc:06.1f}s.png"
         fig.savefig(f, dpi=70); frames.append(f)
+    # assemble the GIF (last frame held longer)
     imgs = [Image.open(f).convert("P", palette=Image.ADAPTIVE) for f in frames]
     dur = [int(1000 / a.fps)] * len(imgs); dur[-1] = 2500
     imgs[0].save(outDir / "flow.gif", save_all=True, append_images=imgs[1:], duration=dur, loop=0, optimize=True)
     print(f"{len(frames)} frames -> {outDir}\ngif: {outDir / 'flow.gif'} ({(outDir / 'flow.gif').stat().st_size / 1e6:.1f} MB)")
+    # optional video encodes: mp4 (H.264) and webm (VP9, plays in browsers without H.264)
     if shutil.which("ffmpeg"):
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-framerate", str(a.fps), "-pattern_type", "glob", "-i",
                         str(outDir / "frame_*.png"), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p",

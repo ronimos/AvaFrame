@@ -15,8 +15,11 @@ from shapely.geometry import shape
 
 import bethel as b
 base = b.BASE
+# minSlope: steepness [deg] that counts as release terrain; nBelow: consecutive flatter cells that end a path;
+# f: block size [cells] for averaging the 1 m DEM to 5 m
 minSlope, nBelow, f = 28.0, 3, 5
 
+# DEM -> 5 m block means -> slope (degrees), smoothed with a 3x3 mean
 with rasterio.open(base / "Inputs/Bethel_DEM.asc") as r:
     z = r.read(1).astype(float); T = r.transform
 n0, n1 = z.shape[0] // f * f, z.shape[1] // f * f
@@ -26,10 +29,12 @@ gy, gx = np.gradient(z5, f)
 slope = ndi.uniform_filter(np.degrees(np.arctan(np.hypot(gx, gy))), 3)
 steep = slope >= minSlope
 
+# original polygon (the untouched copy in data/ is preferred, so this script can be rerun)
 orig = gpd.read_file(base / "Inputs/REL/Bethel_W_Start_Zone.shp") if not (base / "data/Bethel_W_orig.shp").exists() \
     else gpd.read_file(base / "data/Bethel_W_orig.shp")
 origMask = rasterize(orig.geometry, out_shape=z5.shape, transform=T5).astype(bool)
 
+# 8 neighbour offsets and their distances (1 or sqrt 2 cells), used for D8 steepest descent
 nb = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 dist = np.array([np.hypot(*d) for d in nb])
 zone = np.zeros_like(steep)
@@ -49,17 +54,20 @@ for r0, c0 in zip(*np.nonzero(origMask & steep)):
         path.append((r_, c_))
     for p in path: zone[p] = True
 
+# clean up the traced mask: close gaps, open away spurs, fill holes
 zone = ndi.binary_closing(zone, iterations=2)
 zone = ndi.binary_fill_holes(ndi.binary_opening(zone, iterations=1))
 lab, n = ndi.label(zone)
 if n > 1:  # keep components that overlap the original polygon
     keep = np.unique(lab[origMask & zone]); keep = keep[keep > 0]
     zone = np.isin(lab, keep)
+# polygonise, merge, simplify to 5 m
 polys = [shape(g) for g, v in shapes(zone.astype("uint8"), mask=zone, transform=T5)]
 geom = gpd.GeoSeries(polys, crs=b.CRS).union_all().simplify(5).buffer(0)
 new = gpd.GeoDataFrame({"name": ["Bethel_W_Start_Zone"], "thickness": [1.0]}, geometry=[geom], crs=b.CRS)
 
 # keep original, write adjusted
+# keep the original polygon in data/, write the adjusted one as the AvaFrame release
 (base / "data").mkdir(exist_ok=True)
 if not (base / "data/Bethel_W_orig.shp").exists():
     orig.to_file(base / "data/Bethel_W_orig.shp")

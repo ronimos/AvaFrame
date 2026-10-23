@@ -9,6 +9,7 @@ import bethel as b
 base = b.BASE
 relThickness = 1.0  # m, PLACEHOLDER release thickness - set to your design value
 
+# release area: geojson -> shapefile in the DEM CRS, 2D geometry, with the name/thickness attributes AvaFrame expects
 rel = gpd.read_file(base / "data/release_area/Bethel_W_Start_Zone.geojson")
 rel = rel.to_crs(b.CRS)
 rel["geometry"] = rel.geometry.force_2d()
@@ -23,6 +24,7 @@ with rasterio.open(next((base / "data/DEM").glob("*.tif"))) as src:
     arr = src.read(1, window=win)
     transform = src.window_transform(win)
     nodata = src.nodata
+# nodata -> -9999 and write an ESRI ASCII grid, which is what AvaFrame reads as DEM
 arr = np.where(arr == nodata, -9999, arr).astype("float32")
 with rasterio.open(base / "Inputs/Bethel_DEM.asc", "w", driver="AAIGrid", height=arr.shape[0], width=arr.shape[1],
                    count=1, dtype="float32", crs=f"EPSG:{b.CRS}", nodata=-9999, transform=transform) as dst:

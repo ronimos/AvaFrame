@@ -63,6 +63,7 @@ def loadSeries(runs):
                 demExt=terrain["ext"], xl=xl, yl=yl)
 
 
+# HTML skeleton of the report; {title}, {div} (plotly figure), {anim} (video block) and {method} (methodology) are filled in plotInteractive()
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
@@ -262,7 +263,9 @@ def plotInteractive(runs, rho, friction, fname):
     imgX0, imgY1 = dx0 + c0 * cs, dy1 - r0 * cs
     imgW, imgH = (c1 - c0) * cs, (r1 - r0) * cs
 
+    # two columns per thickness: peak velocity (left) and peak thickness (right); coloraxis/coloraxis2 give each column its own scale
     cols = [("Peak flow velocity", "pfv", "m/s", "coloraxis"), ("Peak flow thickness", "pft", "m", "coloraxis2")]
+    # friction class used and release volume per thickness, shown in the panel titles
     info = runInfo(runs, rho)
     titles = [f"{n} - release {t:g} m ({info[t]['cls']})" for t in th for n, *_ in cols]
     fig = make_subplots(rows=len(th), cols=2, subplot_titles=titles, horizontal_spacing=0.1, vertical_spacing=0.04)
@@ -271,6 +274,7 @@ def plotInteractive(runs, rho, friction, fname):
     for _, key, *_ in cols:
         cmax[key] = max(np.nanmax(np.where(s["pft"][t] > footprintThr, s[key][t], np.nan)) for t in th)
 
+    # one row per thickness; cells outside the footprint are masked (nan) so the hillshade shows through
     for i, t in enumerate(th, start=1):
         mask = crop(s["pft"][t]) > footprintThr
         dec = {"pfv": 1, "pft": 2, "ppr": 0}  # rounding keeps the HTML small
@@ -290,12 +294,14 @@ def plotInteractive(runs, rho, friction, fname):
                                          hoverinfo="skip", showlegend=False), row=i, col=j)
             ax = (i - 1) * 2 + j
             suffix = "" if ax == 1 else str(ax)
+            # hillshade as a background image in every panel (one PNG data URI, cropped to the zoom window and thinned to 2 m to keep the HTML small)
             fig.add_layout_image(dict(source=uri, xref=f"x{suffix}", yref=f"y{suffix}", x=imgX0, y=imgY1,
                                       sizex=imgW, sizey=imgH, xanchor="left", yanchor="top", layer="below", sizing="stretch"))
             fig.update_xaxes(range=xl, matches="x", tickformat="d", tickfont_size=9, showgrid=False, row=i, col=j)
             fig.update_yaxes(range=yl, matches="y", tickformat="d", tickfont_size=9, showgrid=False, scaleanchor=f"x{suffix}",
                              constrain="domain", row=i, col=j)
 
+    # shared colour scales per column: the same value gets the same colour in every row
     bar = dict(len=0.9, thickness=14, y=0.5)
     fig.update_layout(
         coloraxis=dict(colorscale="Blues", cmin=0, cmax=cmax["pfv"], colorbar=dict(title="m/s", x=0.455, **bar)),
@@ -304,6 +310,7 @@ def plotInteractive(runs, rho, friction, fname):
         hoverlabel=dict(font_size=12),
     )
     fig.update_annotations(font_size=12)
+    # plotly.js is embedded, so the HTML works offline as a single file
     div = fig.to_html(full_html=False, include_plotlyjs=True)
     pathlib.Path(fname).write_text(PAGE.format(
         title="Bethel avalanche: peak flow velocity and thickness", div=div, anim=animationHtml(friction),
@@ -316,7 +323,9 @@ def plot(runs, rho, friction, fname):
     th, pft, pfv, hill, demExt, meshExt, rel, xl, yl = (s[k] for k in
                                                        ("th", "pft", "pfv", "hill", "demExt", "meshExt", "rel", "xl", "yl"))
     cols = [("Peak flow velocity", pfv, "m/s"), ("Peak flow thickness", pft, "m")]
+    # shared colour maximum per column, taken over footprint cells of all thicknesses
     vmax = [max(np.nanmax(np.where(pft[t] > footprintThr, d[t], np.nan)) for t in th) for _, d, _ in cols]
+    # static version of the same figure (PNG)
     fig, axs = plt.subplots(len(th), 2, figsize=(11, 4.3 * len(th)), constrained_layout=True, squeeze=False)
     for i, t in enumerate(th):
         for j, (name, d, unit) in enumerate(cols):
@@ -345,6 +354,8 @@ def main():
     a = ap.parse_args()
 
     b.OUTPUTS.mkdir(exist_ok=True)
+    # --plot-only reuses existing runs; otherwise (re)run the series first. The HTML is written last because it embeds
+    # the animation and road-reach results if they already exist in Outputs/.
     if a.plot_only:
         runs = findRuns(a.thickness, a.rho, a.friction)
     else:
