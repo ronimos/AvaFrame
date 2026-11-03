@@ -114,8 +114,8 @@ def animationHtml(friction):
     if not srcs:
         return ""
     return f"""<h2>Animation</h2>
-<p class="sub">Flow thickness (top) and velocity (bottom) for each release thickness on a shared clock; a run that has stopped holds its last frame.
- Saved every 2&nbsp;s of simulated time. Colour scales are fixed across columns and frames.
+<p class="sub">Flow thickness for each release thickness on a shared clock; a run that has stopped holds its last frame.
+ Saved every 2&nbsp;s of simulated time. The colour scale is the same in every panel and frame.
  Also saved as <code>flow.gif</code> and individual frames in <code>Outputs/animation_{friction}/</code>.</p>
 <video controls loop muted autoplay playsinline style="width:100%;max-width:1300px">{srcs}Your browser cannot play this video; see flow.gif in the output folder.</video>"""
 

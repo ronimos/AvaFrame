@@ -1,7 +1,7 @@
 """Run com1DFA with saved time steps for several release thicknesses and animate them side by side.
 
-Layout: one column per release thickness; top row flow thickness, bottom row flow velocity, shared colour scales and a
-shared clock (a run that has stopped holds its last frame). Each thickness runs in its own avalanche dir
+Layout: flow thickness only, one panel per release thickness in a grid of --ncols columns (default 2, so 6 runs = 3 rows),
+one shared colour scale and a shared clock (a run that has stopped holds its last frame). Each thickness runs in its own avalanche dir
 Bethel/runs/anim_<friction>/th_<t>/.
 
 Usage (from /home/ron/AvaFrame):
@@ -52,6 +52,7 @@ def main():
     ap.add_argument("--friction", default="samosATAuto")
     ap.add_argument("--dt", type=float, default=2, help="seconds between saved frames")
     ap.add_argument("--fps", type=int, default=6)
+    ap.add_argument("--ncols", type=int, default=2, help="panels per row")
     ap.add_argument("--render-only", action="store_true")
     ap.add_argument("--skip-existing", action="store_true", help="only run thicknesses without saved time steps")
     a = ap.parse_args()
@@ -77,7 +78,6 @@ def main():
     # shared clock = union of all saved times; colour scales (max over all runs/steps) are fixed so frames are comparable
     clock = sorted(set(x for r in runs.values() for x in r[0]))
     vmaxT = max(np.nanmax(ft) for r in runs.values() for ft, _ in r[0].values())
-    vmaxV = max(np.nanmax(fv) for r in runs.values() for _, fv in r[0].values())
 
     # fixed map window around everything the flow ever covers + the release area
     terrain = b.loadTerrain()
@@ -86,25 +86,28 @@ def main():
     xl, yl = b.zoomWindow(anyF, T, rel, pad=100)
     anyF = np.any(anyF, axis=0)
 
-    # figure with one column per thickness (top: flow thickness, bottom: velocity). The artists are created once
+    # figure: one flow-thickness panel per release thickness, filled row by row. The artists are created once
     # and only their data is swapped per frame, which is much faster than redrawing.
     outDir.mkdir(parents=True, exist_ok=True)
     for old in outDir.glob("frame_*.png"):
         old.unlink()
     n = len(a.thickness)
-    fig, axs = plt.subplots(2, n, figsize=(4.6 * n + 1.5, 10.5), constrained_layout=True, squeeze=False)
+    ncol = min(a.ncols, n); nrow = -(-n // ncol)
+    pw = 5.0                                                     # panel width [in]; height follows the map window
+    ph = pw * (yl[1] - yl[0]) / (xl[1] - xl[0])
+    fig, axs = plt.subplots(nrow, ncol, figsize=(pw * ncol + 1.2, ph * nrow + .6), constrained_layout=True, squeeze=False)
     ims = {}
     for j, t in enumerate(a.thickness):
-        for i, (nm, vmax, unit) in enumerate([("Flow thickness", vmaxT, "m"), ("Flow velocity", vmaxV, "m/s")]):
-            ax = axs[i, j]
-            ax.imshow(hill, cmap="gray", extent=dExt, alpha=.8)
-            ims[i, j] = ax.imshow(np.full(anyF.shape, np.nan), cmap="Blues", vmin=0, vmax=vmax, extent=ext)
-            rel.boundary.plot(ax=ax, color="#d95f02", lw=1.2)
-            ax.set_xlim(xl); ax.set_ylim(yl); ax.set_aspect("equal"); ax.tick_params(labelsize=6)
-            ax.ticklabel_format(style="plain", useOffset=False)
-            ax.set_title(f"{nm} - release {t:g} m" + (f"\n({runs[t][1]})" if i == 0 else ""), loc="left", fontsize=9)
-            if j == n - 1:
-                fig.colorbar(ims[i, j], ax=axs[i, :].tolist(), shrink=.7, pad=.01, label=unit)
+        ax = axs.flat[j]
+        ax.imshow(hill, cmap="gray", extent=dExt, alpha=.8)
+        ims[j] = ax.imshow(np.full(anyF.shape, np.nan), cmap="Blues", vmin=0, vmax=vmaxT, extent=ext)
+        rel.boundary.plot(ax=ax, color="#d95f02", lw=1.2)
+        ax.set_xlim(xl); ax.set_ylim(yl); ax.set_aspect("equal"); ax.tick_params(labelsize=6)
+        ax.ticklabel_format(style="plain", useOffset=False)
+        ax.set_title(f"Release {t:g} m ({runs[t][1]})", loc="left", fontsize=10)
+    for ax in axs.flat[n:]:                                      # unused grid cells
+        ax.set_visible(False)
+    fig.colorbar(ims[0], ax=axs, shrink=.5, pad=.01, label="flow thickness (m)")
     # render one PNG per time step
     title = fig.suptitle("")
     frames = []
@@ -112,9 +115,9 @@ def main():
         for j, t in enumerate(a.thickness):
             data = runs[t][0]
             ts = max(x for x in data if x <= tc)  # hold last saved step (and final state once stopped)
-            ft, fv = data[ts]; m = ft > thr
-            ims[0, j].set_data(np.where(m, ft, np.nan)); ims[1, j].set_data(np.where(m, fv, np.nan))
-        title.set_text(f"Bethel avalanche, density {a.rho:g} kg/m3, t = {tc:5.1f} s")
+            ft = data[ts][0]
+            ims[j].set_data(np.where(ft > thr, ft, np.nan))
+        title.set_text(f"Bethel avalanche: flow thickness, density {a.rho:g} kg/m3, t = {tc:5.1f} s")
         f = outDir / f"frame_{k:03d}_t{tc:06.1f}s.png"
         fig.savefig(f, dpi=70); frames.append(f)
     # assemble the GIF (last frame held longer)
