@@ -32,7 +32,7 @@ uv run python Bethel/code/prepInputs.py                 # DEM -> 1 m Inputs/Beth
 uv run python Bethel/code/adjustRelease.py              # optional: slope-adjusted release polygon
 uv run python Bethel/code/makeAnimationSeries.py        # side-by-side animation -> Outputs/animation_<friction>/ (needs ffmpeg for the video)
 uv run python Bethel/code/roadReach.py                  # does the flow reach the road? -> Outputs/road_reach.{csv,png}
-uv run python Bethel/code/runThicknessSeries.py         # last step: runs 0.5/0.75/1/1.5/2 m, writes Outputs/thickness_series.{png,html}
+uv run python Bethel/code/runThicknessSeries.py         # last step: runs 0.25/0.5/0.75/1/1.5/2 m, writes Outputs/thickness_series.{png,html}
 ```
 
 `runThicknessSeries.py` writes the HTML last and embeds the animation (`flow.webm`/`flow.mp4`), the road sensitivity paragraph

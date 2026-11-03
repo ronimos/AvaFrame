@@ -127,6 +127,7 @@ def frictionParagraph(info, dc, th, auto, friction):
                 "differences between rows come from release thickness (and so volume) only.</p>")
     vs, vm = dc["volSmall"], dc["volMedium"]
     mu = dc["mu"]
+    small = [t for t in th if info[t]["vol"] < vs]   # scenarios inside the samosATSmall volume class
     txt = f"""<p><b>How.</b> Friction was set with <code>samosATAuto</code>. AvaFrame computes each simulation's release volume and picks one of
  three calibrations of the samosAT friction model by volume: <code>samosATSmall</code> (&mu; = {mu['samosATSmall']:g}) below {vs:,.0f}&nbsp;m&sup3;,
  <code>samosATMedium</code> (&mu; = {mu['samosATMedium']:g}) from {vs:,.0f} to {vm:,.0f}&nbsp;m&sup3;, and standard <code>samosAT</code>
@@ -134,9 +135,10 @@ def frictionParagraph(info, dc, th, auto, friction):
  (release volume = initial simulated mass / density).</p>
 <p><b>Why.</b> The calibrations assume that larger avalanches are less resisted (lower &mu;). Release thickness changes the volume
  from {min(i['vol'] for i in info.values()):,.0f} to {max(i['vol'] for i in info.values()):,.0f}&nbsp;m&sup3;, so one fixed class would be mis-calibrated for some of
- the depths. In particular <code>samosATSmall</code> is meant for volumes below {vs:,.0f}&nbsp;m&sup3;
- and every scenario here exceeds that, so it was not used. An earlier version of this analysis used <code>samosATSmall</code> for all depths and was
- replaced for that reason.</p>
+ the depths. In particular <code>samosATSmall</code> is meant for volumes below {vs:,.0f}&nbsp;m&sup3;; """ + (
+        "no scenario here is that small, so it was not used. " if not small else
+        f"only the {', '.join(f'{t:g}&nbsp;m' for t in small)} scenario{'s are' if len(small) > 1 else ' is'} below that and use{'s' if len(small) == 1 else ''} it. ") + """An earlier
+ version of this analysis used <code>samosATSmall</code> for all depths, including ones far above that volume, and was replaced for that reason.</p>
 <p><b>Caveat.</b> The class boundaries are step changes. Where a depth sits just on one side of a boundary, the friction jumps between neighbouring
  depths, so part of the difference between those rows is a friction change, not only a thickness change."""
     near = [t for t in th if min(abs(info[t]["vol"] - vs), abs(info[t]["vol"] - vm)) < 5000]
@@ -321,7 +323,7 @@ def plot(runs, rho, friction, fname):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--thickness", type=float, nargs="+", default=[0.5, 0.75, 1.0, 1.5, 2.0], help="release thicknesses [m]")
+    ap.add_argument("--thickness", type=float, nargs="+", default=[0.25, 0.5, 0.75, 1.0, 1.5, 2.0], help="release thicknesses [m]")
     ap.add_argument("--rho", type=float, default=300, help="snow density [kg/m3]")
     ap.add_argument("--friction", default="samosATAuto", help="com1DFA frictModel (samosATAuto picks the class per release volume)")
     ap.add_argument("--clean", action="store_true", help="delete the series' run directories before running")

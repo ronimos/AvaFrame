@@ -21,7 +21,7 @@ import bethel as b
 
 # Scenario matrix: release thicknesses [m] x friction classes. Fixed classes (not samosATAuto) so the matrix
 # shows how sensitive the road result is to friction.
-THICK = [0.5, 0.75, 1.0, 1.5, 2.0]
+THICK = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
 FRICT = ["samosATMedium", "samosAT"]
 # snow density [kg/m3], also used to turn the simulated release mass into a volume
 RHO = 300

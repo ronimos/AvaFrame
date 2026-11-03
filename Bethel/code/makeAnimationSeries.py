@@ -47,7 +47,7 @@ def loadRun(avaDir):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--thickness", type=float, nargs="+", default=[0.5, 0.75, 1.0, 1.5, 2.0])
+    ap.add_argument("--thickness", type=float, nargs="+", default=[0.25, 0.5, 0.75, 1.0, 1.5, 2.0])
     ap.add_argument("--rho", type=float, default=300)
     ap.add_argument("--friction", default="samosATAuto")
     ap.add_argument("--dt", type=float, default=2, help="seconds between saved frames")
