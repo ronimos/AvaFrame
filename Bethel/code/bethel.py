@@ -26,6 +26,8 @@ RUNS = BASE / "runs"
 OUTPUTS = BASE / "Outputs"
 RELEASE = INPUTS / "REL/Bethel_W_Start_Zone.shp"
 DEM = INPUTS / "Bethel_DEM.asc"
+# source DEM that prepInputs.py turns into DEM (survey ground model, 4 cm cells; the older USGS 1 m tile is no longer used)
+SOURCE_DEM = DATA / "DEM/261018_Bethel_Full_Ground-DSM.tiff"
 # EPSG code of the DEM / release / road data (UTM 13N). Change for another site.
 CRS = 26913
 
@@ -50,6 +52,13 @@ def loadTerrain():
     cs = abs(T.a)
     hill = LightSource(315, 45).hillshade(dem, vert_exag=1, dx=cs, dy=cs)
     return dict(dem=dem, T=T, hill=hill, ext=extent(B), rel=gpd.read_file(RELEASE))
+
+
+def roadLines():
+    """Road edge lines (hill side, far side) from data/Road as 2D shapely lines in CRS."""
+    from shapely import force_2d
+    get = lambda pat: force_2d(gpd.read_file(next((DATA / "Road").glob(pat))).to_crs(CRS).geometry.iloc[0])
+    return get("*hill*.geojson"), get("*far*.geojson")
 
 
 def zoomWindow(masks, T, rel, pad):

@@ -8,7 +8,6 @@ Usage (from /home/ron/AvaFrame):  uv run python Bethel/code/roadReach.py [--rend
 """
 import argparse
 
-import geopandas as gpd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -47,11 +46,8 @@ def main():
                 print(f"{fr}, relTh {t:g} m done")
 
     # 2) road geometry: the two edge lines (hill side / far side) and the strip between them, in the DEM's CRS.
-    # The lines may carry a Z value, so the strip polygon is rebuilt with 2D coordinates only.
-    hillL = gpd.read_file(next((b.DATA / "Road").glob("*hill*.geojson"))).to_crs(b.CRS).geometry.iloc[0]
-    farL = gpd.read_file(next((b.DATA / "Road").glob("*far*.geojson"))).to_crs(b.CRS).geometry.iloc[0]
-    strip = Polygon(list(hillL.coords)[:] + list(farL.coords)[::-1])
-    strip = Polygon([(x, y) for x, y, *_ in strip.exterior.coords]).buffer(0)
+        hillL, farL = b.roadLines()
+    strip = Polygon(list(hillL.coords) + list(farL.coords)[::-1]).buffer(0)
 
     # 3) rasterise the lines/strip onto the simulation grid (all_touched so thin lines still hit cells)
     first, T, B = b.peakRaster(runDir(FRICT[0], THICK[0]), "pft")

@@ -6,7 +6,7 @@ Usage (from /home/ron/AvaFrame):
     uv run python Bethel/code/runThicknessSeries.py --clean         # delete the series' run directories first
     uv run python Bethel/code/runThicknessSeries.py --thickness 1 2 --rho 250 --friction samosATMedium
 
-Writes a static PNG and an interactive HTML (plotly, hover shows velocity/thickness/pressure per cell) to Outputs/.
+Writes a static PNG and a self-contained interactive HTML report (linked canvas maps, see interactiveMaps.py) to Outputs/.
 Each thickness is its own AvaFrame avalanche dir under runs/ (settings = Inputs/CFGs/com1DFACfg.ini plus the
 overrides of that run), run in its own process.
 The release shapefile (Inputs/REL) is used as is, run adjustRelease.py first if it needs adjusting.
@@ -63,7 +63,8 @@ def loadSeries(runs):
                 demExt=terrain["ext"], xl=xl, yl=yl)
 
 
-# HTML skeleton of the report; {title}, {div} (plotly figure), {anim} (video block) and {method} (methodology) are filled in plotInteractive()
+# HTML skeleton of the report; {css}, {div} (linked maps), {hist} (closest-approach histogram), {anim} (video block) and
+# {method} (methodology) are filled in plotInteractive()
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
@@ -74,10 +75,12 @@ PAGE = """<!doctype html>
  .sub {{ color: #555; margin: 0 0 8px; }} .method {{ max-width: 900px; }}
  table {{ border-collapse: collapse; margin: 8px 0; }} td, th {{ border: 1px solid #ccc; padding: 3px 10px; text-align: left; }}
  code {{ background: #f2f2f2; padding: 0 3px; }}
+{css}
 </style></head><body>
 <h1>{title}</h1>
-<p class="sub">By release thickness. Hover for values; zoom and pan are linked across panels. Orange outline = release area.</p>
+<p class="sub">One map per release thickness. Hover for values; zoom, pan and the crosshair are linked across panels.</p>
 {div}
+{hist}
 {anim}
 <div class="method">{method}</div>
 </body></html>"""
@@ -168,7 +171,8 @@ def methodologyHtml(runs, rho, friction):
         ver = md.version("avaframe").rsplit(".d2", 1)[0]  # drop uv's dirty-tree date suffix
     except md.PackageNotFoundError:
         ver = "unknown"
-    demName = next((b.DATA / "DEM").glob("*.tif")).name
+    with rasterio.open(b.SOURCE_DEM) as r:
+        srcRes = abs(r.transform.a)
     with rasterio.open(b.DEM) as r:
         demInfo = f"{r.width} x {r.height} cells at {abs(r.transform.a):g} m"
     adj = b.INPUTS / "release_adjustment.json"
@@ -178,7 +182,7 @@ def methodologyHtml(runs, rho, friction):
         release = f"""<p>The release area started from a manually drawn polygon ({a['areaOriginalHa']:.2f} ha). Its downslope
  extent was then set by slope: the zone follows terrain that is <b>&ge; {a['minSlopeDeg']:g}&deg; in the downhill direction</b>.</p>
 <ol>
-<li>Slope was computed from the 1&nbsp;m DEM after averaging to {a['blockCellM']}&nbsp;m blocks, using a finite-difference gradient and a
+<li>Slope was computed from the USGS 1&nbsp;m DEM after averaging to {a['blockCellM']}&nbsp;m blocks, using a finite-difference gradient and a
  {a['slopeSmoothingCells']}&times;{a['slopeSmoothingCells']} mean filter.</li>
 <li>From every cell of the original polygon that is &ge; {a['minSlopeDeg']:g}&deg;, a steepest-descent path (D8 flow direction on the
  {a['blockCellM']}&nbsp;m DEM) was followed downhill. A path continues while slope stays &ge; {a['minSlopeDeg']:g}&deg; and stops after
@@ -189,7 +193,8 @@ def methodologyHtml(runs, rho, friction):
 <li>The mask was cleaned (binary closing/opening, holes filled, only parts overlapping the original polygon kept), polygonised and
  simplified to {a['simplifyM']} m.</li>
 </ol>
-<p>Result: {a['areaAdjustedHa']:.2f} ha (planimetric), {a['addedHa']:.2f} ha added and {a['removedHa']:.2f} ha removed relative to the
+<p>The polygon was derived on the earlier USGS 1&nbsp;m DEM and kept unchanged for the current DEM.
+ Result: {a['areaAdjustedHa']:.2f} ha (planimetric), {a['addedHa']:.2f} ha added and {a['removedHa']:.2f} ha removed relative to the
  original ({(a['areaAdjustedHa'] / a['areaOriginalHa'] - 1) * 100:+.0f}%). Release thickness is uniform over the zone and is the varied parameter.</p>"""
     else:
         release = "<p>The release area is the shapefile in <code>Inputs/REL</code>; no adjustment record was found.</p>"
@@ -201,9 +206,13 @@ def methodologyHtml(runs, rho, friction):
     return f"""
 <h2>Methodology</h2>
 <h3>Terrain</h3>
-<p>Elevation: USGS 1&nbsp;m lidar DEM (<code>{demName}</code>, EPSG:26913 / UTM 13N), cropped to the flow path plus a margin without resampling
- ({demInfo}). AvaFrame then remeshes it internally to a {mesh:g}&nbsp;m computational mesh, so the 1&nbsp;m detail is averaged before the solver runs.
- The hillshade in the plots is from the 1&nbsp;m DEM.</p>
+<p>Elevation: survey ground model <code>{b.SOURCE_DEM.name}</code> (EPSG:26913 / UTM 13N, {srcRes * 100:.2f}&nbsp;cm cells),
+ block-averaged to a 1&nbsp;m grid ({demInfo}). Outside the surveyed area the grid is nodata, so the surveyed area is the simulation
+ domain: flow that leaves it is removed. AvaFrame then remeshes the DEM to a {mesh:g}&nbsp;m computational mesh, so detail finer than
+ that is averaged before the solver runs. The hillshade in the maps is from the 1&nbsp;m grid.</p>
+<p>In a comparison with the USGS 1&nbsp;m lidar DEM used before (made when the DEM was switched, 2026-11-03), this surface sits about 30&nbsp;m lower throughout (a vertical datum
+ difference, which does not affect the flow) and agrees to within about 1&nbsp;m in the open avalanche path. On the forested flanks it is
+ up to about 20&nbsp;m higher than the USGS bare-earth surface, which suggests it still includes some tree canopy there.</p>
 <h3>Release area</h3>
 {release}
 <h3>Simulations</h3>
@@ -215,9 +224,15 @@ def methodologyHtml(runs, rho, friction):
 {frictionText}
 <table><tr><th>Release thickness</th><th>Release volume</th><th>Friction class used</th><th>&mu;</th><th>Run directory</th></tr>{rows}</table>
 <h3>Outputs shown</h3>
-<p>Peak flow velocity (m/s) and peak flow thickness (m): the maximum reached at each cell during the simulation, not a snapshot. Cells are
- shown where peak thickness exceeds {footprintThr:g}&nbsp;m. Colour scales are shared per column. Hovering shows easting/northing (EPSG:26913) and
- the cell's peak velocity, thickness and pressure.</p>
+<p>Peak flow thickness (m), velocity (m/s) and pressure (kPa): the maximum reached at each cell during the simulation, not a
+ snapshot. Cells are shown where peak thickness exceeds {footprintThr:g}&nbsp;m. Colour scales are shared across panels. The readout
+ gives each run's values at the cursor, its easting/northing (EPSG:26913), and how many runs reach that cell.</p>
+<p><b>Road reference.</b> "Reaches" and "crosses" mean the flow touches the hill-side and far-side road edge lines (same test as
+ <code>roadReach.py</code>). Distances in the maps and the histogram are measured to one point: where the avalanche path meets the
+ hill-side edge. The path is traced by steepest descent (D8, on the pit-filled {mesh:g}&nbsp;m DEM) from the highest cell reached by at
+ least half of the runs. The trace stops 40&nbsp;m from the road, because closer in it would turn along the road-cut ditch, and its
+ direction over the last 100&nbsp;m is projected onto the road. The "m short of the road edge" in the panel titles is instead the gap to
+ the nearest point of the edge line, so the two distances differ.</p>
 <h3>Limitations</h3>
 <ul>
 <li>Results are from a single deterministic model setup and have not been calibrated or validated against observed events at this site.</li>
@@ -227,95 +242,57 @@ def methodologyHtml(runs, rho, friction):
 <p class="sub">Generated {datetime.date.today().isoformat()} by <code>Bethel/runThicknessSeries.py</code>.</p>"""
 
 
-def plotInteractive(runs, rho, friction, fname):
-    """Plotly version: hover shows easting/northing and thickness, velocity, pressure of that cell for the run."""
+def roadStatus(pft, hillL, farL, T, thr):
+    """Same test as roadReach.py: flow (pft > thr) touching the hill-side / far-side edge line, else gap to the hill-side edge."""
+    from rasterio.features import rasterize
+    from shapely import distance, points
+    flow = pft > thr
+    hit = lambda g: bool((flow & rasterize([g], out_shape=flow.shape, transform=T, all_touched=True).astype(bool)).any())
+    if hit(farL):
+        return "<b>crosses the road</b>"
+    if hit(hillL):
+        return "<b>reaches the road</b>"
+    rr, cc = np.nonzero(flow)
+    x, y = T * (cc + .5, rr + .5)
+    return f"stops {distance(points(x, y), hillL).min():.0f} m short of the road edge"
+
+
+def roadGroups(runs, friction):
+    """Histogram groups: this series plus the roadReach.py runs (fixed friction classes) if they exist."""
+    import roadReach as rr
+    groups = [dict(name=friction, runs=[dict(id=f"{t:g} m", pft=b.peakRaster(runs[t], "pft")[0]) for t in sorted(runs)])]
+    for fr in rr.FRICT:
+        dirs = {t: rr.runDir(fr, t) for t in rr.THICK}
+        if all((d / "Outputs/com1DFA/peakFiles").is_dir() for d in dirs.values()):
+            groups.append(dict(name=fr, runs=[dict(id=f"{t:g} m", pft=b.peakRaster(d, "pft")[0]) for t, d in dirs.items()]))
+    return groups
+
+
+def plotInteractive(runs, rho, friction, fname, png):
+    """Self-contained HTML: linked canvas maps per thickness (interactiveMaps.py), animation, methodology."""
     import base64
-    import io
-    from PIL import Image
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
+    import interactiveMaps as im
 
     s = loadSeries(runs)
-    th, T, xl, yl = s["th"], s["T"], s["xl"], s["yl"]
-    nrow, ncol = s["pft"][th[0]].shape
-    xc = T.c + T.a * (np.arange(ncol) + .5)   # cell-centre easting
-    yc = T.f + T.e * (np.arange(nrow) + .5)   # cell-centre northing (decreasing)
-    cx = (xc >= xl[0]) & (xc <= xl[1])
-    cy = (yc >= yl[0]) & (yc <= yl[1])
-    # heatmaps only need the footprint's bounding box (everything else is empty), which keeps the HTML small
-    foot = np.any([s["pft"][t] > footprintThr for t in th], axis=0)
-    fr, fc = np.nonzero(foot)
-    cx &= (np.arange(ncol) >= fc.min() - 1) & (np.arange(ncol) <= fc.max() + 1)
-    cy &= (np.arange(nrow) >= fr.min() - 1) & (np.arange(nrow) <= fr.max() + 1)
-    xc, yc = xc[cx], yc[cy]
-    crop = lambda a: a[np.ix_(cy, cx)].astype("float32")
-
-    # hillshade as one PNG (reused as background in every panel), clipped to the zoom window and thinned to 2 m
-    dx0, dx1, dy0, dy1 = s["demExt"]
-    hs = s["hill"]
-    cs = (dx1 - dx0) / hs.shape[1]
-    c0, c1 = int((xl[0] - dx0) / cs), int((xl[1] - dx0) / cs)
-    r0, r1 = int((dy1 - yl[1]) / cs), int((dy1 - yl[0]) / cs)
-    hs = hs[r0:r1:2, c0:c1:2]
-    buf = io.BytesIO()
-    Image.fromarray((np.clip(np.nan_to_num(hs), 0, 1) * 255).astype("uint8")).save(buf, format="PNG")
-    uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    imgX0, imgY1 = dx0 + c0 * cs, dy1 - r0 * cs
-    imgW, imgH = (c1 - c0) * cs, (r1 - r0) * cs
-
-    # two columns per thickness: peak velocity (left) and peak thickness (right); coloraxis/coloraxis2 give each column its own scale
-    cols = [("Peak flow velocity", "pfv", "m/s", "coloraxis"), ("Peak flow thickness", "pft", "m", "coloraxis2")]
-    # friction class used and release volume per thickness, shown in the panel titles
+    th, T = s["th"], s["T"]
     info = runInfo(runs, rho)
-    titles = [f"{n} - release {t:g} m ({info[t]['cls']})" for t in th for n, *_ in cols]
-    fig = make_subplots(rows=len(th), cols=2, subplot_titles=titles, horizontal_spacing=0.1, vertical_spacing=0.04)
-    relXY = [np.array(g.exterior.coords) for g in s["rel"].geometry]
-    cmax = {}
-    for _, key, *_ in cols:
-        cmax[key] = max(np.nanmax(np.where(s["pft"][t] > footprintThr, s[key][t], np.nan)) for t in th)
-
-    # one row per thickness; cells outside the footprint are masked (nan) so the hillshade shows through
-    for i, t in enumerate(th, start=1):
-        mask = crop(s["pft"][t]) > footprintThr
-        dec = {"pfv": 1, "pft": 2, "ppr": 0}  # rounding keeps the HTML small
-        z = {k: np.round(np.where(mask, crop(s[k][t]), np.nan), dec[k]).astype("float32") for k in dec}
-        for j, (name, key, unit, cax) in enumerate(cols, start=1):
-            # customdata: velocity / thickness / pressure of the same cell, so either panel shows all three
-            cd = np.dstack([z["pfv"], z["pft"], z["ppr"]])
-            fig.add_trace(go.Heatmap(
-                x=xc, y=yc, z=z[key], customdata=cd, coloraxis=cax, opacity=0.9, name="",
-                hovertemplate=("E %{x:.0f}  N %{y:.0f}<br>"
-                               f"<b>{name}: %{{z:.2f}} {unit}</b><br>"
-                               "velocity %{customdata[0]:.1f} m/s<br>thickness %{customdata[1]:.2f} m<br>"
-                               "pressure %{customdata[2]:.0f} kPa<extra>release " + f"{t:g} m</extra>"),
-            ), row=i, col=j)
-            for xy in relXY:
-                fig.add_trace(go.Scatter(x=xy[:, 0], y=xy[:, 1], mode="lines", line=dict(color="#d95f02", width=2),
-                                         hoverinfo="skip", showlegend=False), row=i, col=j)
-            ax = (i - 1) * 2 + j
-            suffix = "" if ax == 1 else str(ax)
-            # hillshade as a background image in every panel (one PNG data URI, cropped to the zoom window and thinned to 2 m to keep the HTML small)
-            fig.add_layout_image(dict(source=uri, xref=f"x{suffix}", yref=f"y{suffix}", x=imgX0, y=imgY1,
-                                      sizex=imgW, sizey=imgH, xanchor="left", yanchor="top", layer="below", sizing="stretch"))
-            fig.update_xaxes(range=xl, matches="x", tickformat="d", tickfont_size=9, showgrid=False, row=i, col=j)
-            fig.update_yaxes(range=yl, matches="y", tickformat="d", tickfont_size=9, showgrid=False, scaleanchor=f"x{suffix}",
-                             constrain="domain", row=i, col=j)
-
-    # shared colour scales per column: the same value gets the same colour in every row
-    bar = dict(len=0.9, thickness=14, y=0.5)
-    fig.update_layout(
-        coloraxis=dict(colorscale="Blues", cmin=0, cmax=cmax["pfv"], colorbar=dict(title="m/s", x=0.455, **bar)),
-        coloraxis2=dict(colorscale="Blues", cmin=0, cmax=cmax["pft"], colorbar=dict(title="m", x=1.0, **bar)),
-        height=520 * len(th), width=1250, margin=dict(l=70, r=40, t=40, b=40), plot_bgcolor="rgba(0,0,0,0)",
-        hoverlabel=dict(font_size=12),
-    )
-    fig.update_annotations(font_size=12)
-    # plotly.js is embedded, so the HTML works offline as a single file
-    div = fig.to_html(full_html=False, include_plotlyjs=True)
+    hillL, farL = b.roadLines()
+    panels = [dict(id=f"{t:g}", title=f"Release {t:g} m",
+                   sub=f"({info[t]['cls']}, {info[t]['vol']:,.0f} m&sup3;)",
+                   status=roadStatus(s["pft"][t], hillL, farL, T, footprintThr),
+                   fields={k: s[k][t] for k in ("pft", "pfv", "ppr")}) for t in th]
+    fields = [dict(key="pft", name="Peak flow thickness", unit="m", scale=100, dec=2),
+              dict(key="pfv", name="Peak flow velocity", unit="m/s", scale=100, dec=1),
+              dict(key="ppr", name="Peak flow pressure", unit="kPa", scale=10, dec=0)]
+    dem, demT, _ = b.readRaster(b.DEM)
+    printPng = "data:image/png;base64," + base64.b64encode(pathlib.Path(png).read_bytes()).decode()
+    css, maps, hist = im.section(printPng, panels=panels, T=T, fields=fields, thr=footprintThr, roads=[hillL, farL],
+                                 roadRef=hillL, release=list(s["rel"].geometry), dem1=dem, demT=demT,
+                                 groups=roadGroups(runs, friction))
     pathlib.Path(fname).write_text(PAGE.format(
-        title="Bethel avalanche: peak flow velocity and thickness", div=div, anim=animationHtml(friction),
+        title="Bethel avalanche: peak flow by release thickness", css=css, div=maps, hist=hist, anim=animationHtml(friction),
         method=methodologyHtml(runs, rho, friction)))
-    print("saved", fname)
+    print("saved", fname, f"({pathlib.Path(fname).stat().st_size / 1e6:.1f} MB)")
 
 
 def plot(runs, rho, friction, fname):
@@ -350,7 +327,7 @@ def main():
     ap.add_argument("--clean", action="store_true", help="delete the series' run directories before running")
     ap.add_argument("--plot-only", action="store_true", help="skip simulations, only (re)plot existing results")
     ap.add_argument("--out", default=str(b.OUTPUTS / "thickness_series.png"), help="static figure file")
-    ap.add_argument("--html", default=str(b.OUTPUTS / "thickness_series.html"), help="interactive plotly figure file")
+    ap.add_argument("--html", default=str(b.OUTPUTS / "thickness_series.html"), help="interactive HTML report")
     a = ap.parse_args()
 
     b.OUTPUTS.mkdir(exist_ok=True)
@@ -363,7 +340,7 @@ def main():
             shutil.rmtree(seriesDir(a.rho, a.friction), ignore_errors=True)
         runs = runSeries(a.thickness, a.rho, a.friction)
     plot(runs, a.rho, a.friction, a.out)
-    plotInteractive(runs, a.rho, a.friction, a.html)
+    plotInteractive(runs, a.rho, a.friction, a.html, a.out)
 
 
 if __name__ == "__main__":
