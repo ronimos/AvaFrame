@@ -1,0 +1,47 @@
+# Settings for siteTools/ (run: uv run python siteTools/runSite.py --site McClure). Paths are relative to this folder.
+title = "McClure (Lone Tree Bowl)"
+crs = 26913                       # EPSG of the DEM (horizontal part); vector files are reprojected to it
+sourceDem = "data/DEM/260910_LoneTree_Full_Path_Bare_Ground-DSM.tiff"
+demCell = 1.0                     # m, cell size of the prepared DEM (Inputs/McClure_DEM.asc)
+# cropBounds = [xmin, ymin, xmax, ymax]   # optional, DEM CRS
+release = "data/release_area/Lone_Tree_Bowl_SZ.kml"
+releaseName = "Lone_Tree_Bowl_SZ"
+thicknesses = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]   # m
+rho = 300                         # kg/m3
+friction = "samosATAuto"          # main series + animation
+roadFrictions = ["samosATMedium", "samosAT"]     # fixed classes for the road sensitivity matrix
+
+[road]
+hillSide = "data/Road/McClure_inside.kml"     # edge nearer the slope: "reaches the road"
+farSide = "data/Road/McClure_outside.kmz"     # other edge: "crosses the road"
+# window = [xmin, xmax, ymin, ymax]           # optional map window for road_reach.png
+
+[report]
+terrainNote = """<p><b>Vegetation in the surface.</b> Although the file is labelled bare ground, individual tree and shrub crowns are
+ visible in it: relative to a 15&nbsp;m median-filtered surface, the start zone has bumps of +5.7&nbsp;m (95th percentile) to
+ +10&nbsp;m (99th), the forest beside the path up to about +14&nbsp;m, and the open path gully about +2&nbsp;m.
+ They were removed before the runs (next paragraph).</p>"""
+limitations = [
+  "Shrubs (about 1-1.5 m) cover the start zone and the path. The plain series does not model them; the shrub series adds them as an uncalibrated resistance area outside the release polygon. Neither models shrubs anchoring the slab in the start zone.",
+  "Peak flow thickness where the gully reaches the road is 3-5 m even for the thinnest release. It is the maximum during the run, not a deposit depth, and has not yet been checked in detail.",
+]
+
+# remove tree/shrub crowns from the survey surface (it is labelled bare ground but still holds vegetation); see siteTools/groundFilter.py
+[vegetationFilter]
+windows = [3, 5, 9, 15, 21]       # m, opening window sizes
+dh0 = 0.5                         # m, height threshold ...
+slope = 0.15                      # ... plus slope * window, so convex ground is kept
+
+# shrub cover as a com1DFA resistance area (variant runs: runThicknessSeries.py --shrubs)
+[shrubs]
+height = 1.5                      # m; flow deeper than this overrides the shrubs (forestThMax)
+excludeRelease = true             # no shrub resistance inside the release polygon
+
+# named release scenarios, run with every series (shown first in the report)
+[[scenario]]
+id = "D2"
+release = "data/release_area/McClure_D2_assumed.geojson"
+thickness = 0.5
+description = """an assumed D2-sized slab (about 100&nbsp;t): a 12.9&nbsp;m-radius patch at the top of the start zone (2,894&nbsp;m,
+ about 38&deg;). Its location is an assumption, not an observed D2 outline. Recorded D2 and D1.5 avalanches on this path have not
+ reached the road; the one known run past the road was on 24 February 2010."""

@@ -1,0 +1,17 @@
+{
+ "source": "260910_LoneTree_Full_Path_Bare_Ground-DSM.tiff",
+ "cellM": 1.0,
+ "vegetationFraction": 0.289,
+ "removedMedianM": 4.69,
+ "removedP95M": 16.85,
+ "removedMaxM": 31.1,
+ "windows": [
+  3,
+  5,
+  9,
+  15,
+  21
+ ],
+ "dh0": 0.5,
+ "slope": 0.15
+}

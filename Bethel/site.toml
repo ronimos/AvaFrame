@@ -1,0 +1,23 @@
+# Settings for siteTools/ (run: uv run python siteTools/runSite.py --site Bethel). Paths are relative to this folder.
+# Note: Inputs/REL holds the slope-adjusted polygon from code/adjustRelease.py; rerun prepInputs with --dem-only to keep it.
+title = "Bethel"
+crs = 26913
+sourceDem = "data/DEM/261018_Bethel_Full_Ground-DSM.tiff"
+demCell = 1.0
+release = "data/release_area/Bethel_W_Start_Zone.geojson"
+releaseName = "Bethel_W_Start_Zone"
+thicknesses = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]
+rho = 300
+friction = "samosATAuto"
+roadFrictions = ["samosATMedium", "samosAT"]
+
+[road]
+hillSide = "data/Road/Road - hill side.geojson"
+farSide = "data/Road/Road - far side.geojson"
+window = [425250, 426050, 4394500, 4395250]
+
+[report]
+terrainNote = """<p>In a comparison with the USGS 1&nbsp;m lidar DEM used before (made when the DEM was switched, 2026-11-03), this surface sits about 30&nbsp;m lower throughout (a vertical datum
+ difference, which does not affect the flow) and agrees to within about 1&nbsp;m in the open avalanche path. On the forested flanks it is
+ up to about 20&nbsp;m higher than the USGS bare-earth surface, which suggests it still includes some tree canopy there.</p>"""
+releaseNote = "<p>The polygon was derived on the earlier USGS 1&nbsp;m DEM and kept unchanged for the current DEM.</p>"
