@@ -175,10 +175,11 @@ def runCom1DFA(avaDir, overrides=None, res=False, rel=None):
     for src in INPUTS.iterdir():
         if src.name in ("CFGs", "remeshedRasters", "scenarios") or src.suffix == ".json" or (src.name == "RES" and not res):
             continue
-        if src.name == "REL" and rel is not None:
-            src = pathlib.Path(rel)
-        if not (inputs / src.name).exists():
-            (inputs / src.name).symlink_to(src)
+        name = src.name
+        if name == "REL" and rel is not None:
+            src = pathlib.Path(rel)                # linked as REL whatever the folder is called
+        if not (inputs / name).is_symlink() and not (inputs / name).exists():
+            (inputs / name).symlink_to(src)
     for prj in (inputs / "remeshedRasters").glob("*.prj"):  # AvaFrame would glob the .prj sidecar as a raster
         prj.unlink()
     shutil.rmtree(avaDir / "Outputs", ignore_errors=True)
