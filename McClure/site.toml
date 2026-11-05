@@ -4,8 +4,8 @@ crs = 26913                       # EPSG of the DEM (horizontal part); vector fi
 sourceDem = "data/DEM/260910_LoneTree_Full_Path_Bare_Ground-DSM.tiff"
 demCell = 1.0                     # m, cell size of the prepared DEM (Inputs/McClure_DEM.asc)
 # cropBounds = [xmin, ymin, xmax, ymax]   # optional, DEM CRS
-release = "data/release_area/Lone_Tree_Bowl_SZ.kml"
-releaseName = "Lone_Tree_Bowl_SZ"
+release = "data/release_area/LoneTree_2010_release.kml"
+releaseName = "LoneTree_2010_release"
 thicknesses = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0]   # m
 rho = 300                         # kg/m3
 friction = "samosATAuto"          # main series + animation
@@ -17,14 +17,57 @@ farSide = "data/Road/McClure_outside.kmz"     # other edge: "crosses the road"
 # window = [xmin, xmax, ymin, ymax]           # optional map window for road_reach.png
 
 [report]
+releaseNote = """<p>It is the area that released on 22 February 2010, drawn by overlaying the incident report's aerial photo (Figure 3) on
+ Google Earth: 23% of the whole start zone, in its south part (see Observed avalanches). Earlier versions of this report released the
+ whole start zone (<code>LoneTree_start_zone.kml</code>, 2.28&nbsp;ha); every thickness of that crossed the road.</p>"""
 terrainNote = """<p><b>Vegetation in the surface.</b> Although the file is labelled bare ground, individual tree and shrub crowns are
  visible in it: relative to a 15&nbsp;m median-filtered surface, the start zone has bumps of +5.7&nbsp;m (95th percentile) to
  +10&nbsp;m (99th), the forest beside the path up to about +14&nbsp;m, and the open path gully about +2&nbsp;m.
  They were removed before the runs (next paragraph).</p>"""
 limitations = [
-  "Shrubs (about 1-1.5 m) cover the start zone and the path. The plain series does not model them; the shrub series adds them as an uncalibrated resistance area outside the release polygon. Neither models shrubs anchoring the slab in the start zone.",
-  "Peak flow thickness where the gully reaches the road is 3-5 m even for the thinnest release. It is the maximum during the run, not a deposit depth, and has not yet been checked in detail.",
+  "Shrubs (about 1-1.5 m) cover the start zone and the path and are not modelled, apart from the vegetation filter on the surface. In an earlier trial with the whole start zone as release, treating them as an uncalibrated com1DFA resistance area lowered road pressure by 15-30%; that variant is not published. Neither models shrubs anchoring the slab in the start zone.",
+  "Peak flow thickness on the road is 2-3 m even for the thinnest release in the fixed-friction runs. It is the maximum during the run, not a deposit depth (the 2010 debris on the road was 3-6 ft deep), and has not yet been checked in detail.",
+  "The surveyed area ends below the lower switchback, so runs that go further leave the simulation domain there; their full runout is not known.",
 ]
+calibrationStatus = "The runs are not calibrated. One observed event (22 Feb 2010, see Observed avalanches) has been compared: it is matched at about &mu; 0.30, against the 0.22 used here, so runout past the road is probably overstated."
+publishVariants = [""]            # only the plain series goes online (siteTools/publish.py); the shrub series stays local
+observedFigure = "Outputs/event2010_calibration.png"   # from calibration/event2010.py
+observedCaption = """22 February 2010: release drawn from the report's Figure 3 in Google Earth (orange) and the whole extent from a photo
+ resection of the same figure (red), with three model runs from that release (density 200&nbsp;kg/m&sup3;, samosATSmall, depth and &mu; as
+ titled). White dashed: whole start zone. Black: road edge lines. Flow is shown where peak thickness exceeds 0.1&nbsp;m."""
+observed = """<p><b>Record.</b> The CAIC/CDOT incident report for 22 February 2010 (R. Hunker) lists slab avalanches in Lone Tree Bowl from
+ 1994 to 2010. All 15 size-2 slabs (one of them to ground) stopped short of the highway. Two D2.5 slabs to ground (31 Jan 1996, 12 Jan
+ 2005) reached the road edge. D3 slabs to ground crossed it on 12 Feb 1994 and 22 Feb 2010; for a second D3 on 26 Feb 1994 the
+ table does not say. Before the current highway was built,
+ the path was seen to run to about the position of today's lower road (1950s-60s, A. Mears 1994). Other records add three D2 and
+ several D1.5 avalanches, none of which reached the road, and the winter of 2019, when the start zone held 200-225&nbsp;cm of snow and did not
+ avalanche.</p>
+<p><b>22 February 2010.</b> SS-N-R3-D3-G, natural, after a four-day storm with 40&nbsp;in of new snow. The fracture line was about 6&nbsp;ft
+ deep, the full snow depth, and about 20% of the start zone released, on its north aspect. The crown was at 9,400&nbsp;ft (2,865&nbsp;m) and
+ the runout at 7,700&nbsp;ft (2,347&nbsp;m). Debris covered 300&nbsp;ft (91&nbsp;m) of the upper switchback 3-6&nbsp;ft deep; most of
+ the avalanche went over the road and the embankment and stopped short of the lower switchback.</p>
+<p><b>Release outline.</b> The release area used in the scenarios above, <code>LoneTree_2010_release.kml</code> (0.53&nbsp;ha,
+ 2,783-2,843&nbsp;m, median slope 39&deg;), was drawn by overlaying the report's aerial photo (Figure 3) on Google Earth. It lies inside the
+ south part of the whole start zone (<code>LoneTree_start_zone.kml</code>, 2.28&nbsp;ha) and covers 23% of it, in line with the report's
+ "20% of the start zone". The whole extent shown in red comes from a separate photo resection of the same figure (camera fitted to
+ Highway 133 and the gully on a USGS DEM, outline projected onto the terrain; <code>McClure/data/reports/fig3_resection/</code>). Its
+ track below the gully junction and its runout (2,353&nbsp;m against the report's 2,347&nbsp;m) agree with the model, but its upper part
+ lies about 100&nbsp;m north of the Google Earth release and is less reliable.</p>
+<p><b>Friction test.</b> The 2010 release was run at 1.0, 1.4 and 1.8&nbsp;m average depth (1.3, 1.9 and 2.4&nbsp;kt, D3-D3.5 by mass,
+ matching the reported D3) with &mu; = 0.18-0.42 (samosATSmall, density 200&nbsp;kg/m&sup3;; <code>McClure/calibration/event2010.py</code>).
+ With &mu; 0.26 or less every run crossed the road and went past the lower switchback to 2,278-2,294&nbsp;m, at the edge of the
+ surveyed area. The observed runout was matched at &mu; 0.30 (1.0&nbsp;m: 2,348&nbsp;m) to about 0.32 (1.4-1.8&nbsp;m: 2,324&nbsp;m at
+ 0.30, 2,373-2,405&nbsp;m at 0.34). At &mu; 0.38 or more no run reached the road. The model hits 30-45&nbsp;m of road against the
+ observed 91&nbsp;m. An earlier test with an assumed D2.5 slab (308&nbsp;t at the top of the start zone) reached the road edge, as the
+ D2.5s did, at &mu; 0.26, and stopped 230-310&nbsp;m short at &mu; 0.30.</p>"""
+observedAfter = """<p><b>What this means for the scenarios.</b> The scenarios use the 2010 release with AvaFrame's volume-based friction, which
+ gives samosATSmall (&mu; 0.22) for every depth. At that friction a 2010-sized release (1-2&nbsp;m) runs past the lower switchback, while
+ the observed avalanche stopped short of it: the matching friction is about &mu; 0.30 (at density 200&nbsp;kg/m&sup3;). The model also
+ crosses the road from 0.25&nbsp;m (about 500&nbsp;t, D2.5 by mass), where the record has D2.5s only reaching the edge. So the scenarios
+ above are on the long side: whether a release of 0.5&nbsp;m or more crosses the road agrees with the D3s in the record, but how far
+ flow runs past it, and the road impact of the thinnest releases, are probably overstated. The assumed D2 stopping well short of the
+ road agrees with the record. A friction calibrated on one event is not yet a site calibration; the assumed D2.5 test needed
+ &mu; 0.26, slightly lower.</p>"""
 
 # remove tree/shrub crowns from the survey surface (it is labelled bare ground but still holds vegetation); see siteTools/groundFilter.py
 [vegetationFilter]
@@ -40,8 +83,8 @@ excludeRelease = true             # no shrub resistance inside the release polyg
 # named release scenarios, run with every series (shown first in the report)
 [[scenario]]
 id = "D2"
-release = "data/release_area/McClure_D2_assumed.geojson"
+release = "data/release_area/LoneTree_D2_assumed.geojson"
 thickness = 0.5
 description = """an assumed D2-sized slab (about 100&nbsp;t): a 12.9&nbsp;m-radius patch at the top of the start zone (2,894&nbsp;m,
  about 38&deg;). Its location is an assumption, not an observed D2 outline. Recorded D2 and D1.5 avalanches on this path have not
- reached the road; the one known run past the road was on 24 February 2010."""
+ reached the road; the incident report lists D3s crossing it in 1994 and on 22 February 2010."""

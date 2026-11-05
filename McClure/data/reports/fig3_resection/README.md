@@ -1,6 +1,6 @@
 # 2010 avalanche outline from Figure 3 (photo resection)
 
-`McClure/data/release_area/McClure_Feb2010_fig3.geojson` holds the 22 Feb 2010 avalanche extent and its release part,
+`McClure/data/release_area/LoneTree_2010_fig3_resection.geojson` holds the 22 Feb 2010 avalanche extent and its release part,
 taken from Figure 3 of the CAIC/CDOT incident report (`../201002022_LoneTree Bowl Incident.pdf`).
 
 Method (2026-11-05):
@@ -20,3 +20,8 @@ larger than "20% of the start zone"; it may include the upper track.
 Files: `cam.py` (camera model, DEM lookup, road fit) and `extract.py` (outline ray casting, polygons, stats) are helper
 modules; the fitted camera is in the geojson properties. `usgs10.tif` is the USGS 1/3 arc-second DEM clip and
 `co133_utm.json` the OSM road lines in EPSG:26913.
+
+Later check (2026-11-05): Ron drew the 2010 release by overlaying Figure 3 on Google Earth
+(`data/release_area/LoneTree_2010_release.kml`, 0.53 ha, 23% of the start zone). It lies about 100 m south of this
+resection's release part, and model runs from it follow the resection's track only below the gully junction. The upper
+part of the resection outline (release and upper track) is therefore off; its lower track and runout agree.

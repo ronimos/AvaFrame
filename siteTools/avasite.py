@@ -180,6 +180,8 @@ def runCom1DFA(avaDir, overrides=None, res=False, rel=None):
             src = pathlib.Path(rel)                # linked as REL whatever the folder is called
         if not (inputs / name).is_symlink() and not (inputs / name).exists():
             (inputs / name).symlink_to(src)
+    if rel is not None and not (inputs / "REL").exists():  # also when the site has no Inputs/REL of its own
+        (inputs / "REL").symlink_to(pathlib.Path(rel))
     for prj in (inputs / "remeshedRasters").glob("*.prj"):  # AvaFrame would glob the .prj sidecar as a raster
         prj.unlink()
     shutil.rmtree(avaDir / "Outputs", ignore_errors=True)

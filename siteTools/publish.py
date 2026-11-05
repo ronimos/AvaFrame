@@ -2,7 +2,8 @@
 
 Usage (from the repo root):  uv run python siteTools/publish.py --site McClure
 Reports: <Site>/Outputs/thickness_series[_<variant>].html -> WEB/<Site>[_<variant>]_runout_scenarios.html (e.g. the
-_shrubs variant); WEB/index.html lists every report there,
+_shrubs variant). site.toml [report] publishVariants (e.g. [""] = plain only) limits which variants go online; this site's
+other variants are then removed from WEB. WEB/index.html lists every report there,
 with the site title and date read from each report. WEB defaults to /home/www/html/ron/avalanche_paths (env AVA_WEB overrides).
 """
 import datetime
@@ -16,8 +17,15 @@ import avasite as b
 
 WEB = pathlib.Path(os.environ.get("AVA_WEB", "/home/www/html/ron/avalanche_paths"))
 WEB.mkdir(parents=True, exist_ok=True)
+keep = b.CFG.get("report", {}).get("publishVariants")            # None = every variant
 for src in sorted(b.OUTPUTS.glob("thickness_series*.html")):
     variant = src.stem.removeprefix("thickness_series")          # "" or "_shrubs"
+    if keep is not None and variant not in keep:
+        old = WEB / f"{b.SITE}{variant}_runout_scenarios.html"
+        if old.exists():
+            old.unlink()
+            print("removed", old, "(not in publishVariants)")
+        continue
     dst = WEB / f"{b.SITE}{variant}_runout_scenarios.html"
     shutil.copy2(src, dst)
     print("copied", src, "->", dst)

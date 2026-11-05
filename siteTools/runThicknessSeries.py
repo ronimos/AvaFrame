@@ -86,7 +86,7 @@ def loadSeries(runs):
 
 
 # HTML skeleton of the report; {css}, {div} (linked maps), {hist} (closest-approach histogram), {anim} (video block) and
-# {method} (methodology) are filled in plotInteractive()
+# {observed} (observed avalanches, optional) and {method} (methodology) are filled in plotInteractive()
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
@@ -104,7 +104,7 @@ PAGE = """<!doctype html>
 {div}
 {hist}
 {anim}
-<div class="method">{method}</div>
+<div class="method">{observed}{method}</div>
 </body></html>"""
 
 
@@ -264,12 +264,29 @@ def methodologyHtml(runs, rho, friction):
  the nearest point of the edge line, so the two distances differ.</p>""") + f"""
 <h3>Limitations</h3>
 <ul>
-<li>Results are from a single deterministic model setup and have not been calibrated or validated against observed events at this site.</li>
+<li>{b.CFG.get("report", {}).get("calibrationStatus", "Results are from a single deterministic model setup and have not been calibrated or validated against observed events at this site.")}</li>
 <li>Friction classes come from volume bands and change in steps; a class change between depths is a modelling choice, not a measured difference.</li>
 <li>Release thickness is a scenario input, not a measurement""" + (f"; slope and release-area extent depend on the 5&nbsp;m averaging and the {a['minSlopeDeg']:g}&deg; threshold" if adj.exists() else "; it is uniform over the whole release polygon") + """.</li>
 """ + "".join(f"<li>{x}</li>" for x in b.CFG.get("report", {}).get("limitations", [])) + f"""
 </ul>
 <p class="sub">Generated {datetime.date.today().isoformat()} by <code>siteTools/runThicknessSeries.py --site {b.SITE}</code>.</p>"""
+
+
+def observedHtml():
+    """Optional "Observed avalanches" section: site.toml [report] observed (HTML) and observedFigure (image, embedded)."""
+    import base64
+    rep = b.CFG.get("report", {})
+    if "observed" not in rep:
+        return ""
+    fig = ""
+    if rep.get("observedFigure"):
+        f = b.BASE / rep["observedFigure"]
+        if not f.exists():
+            sys.exit(f"{f} not found (site.toml [report] observedFigure)")
+        fig = (f'<figure style="max-width:none;margin:12px 0"><img style="width:100%" alt="observed avalanche and model runs" '
+               f'src="data:image/png;base64,{base64.b64encode(f.read_bytes()).decode()}">'
+               f'<figcaption class="sub">{rep.get("observedCaption", "")}</figcaption></figure>')
+    return f"<h2>Observed avalanches</h2>\n{rep['observed']}\n{fig}\n{rep.get('observedAfter', '')}"
 
 
 def scenarioHtml(keys):
@@ -344,7 +361,8 @@ def roadGroups(runs, friction, rho):
     import roadReach as rr
     label = lambda shrubs: f"{friction}{' + shrubs' if shrubs else ''}"
     groups = [dict(name=label(SHRUBS), runs=[dict(id=lab(t, False), pft=b.peakRaster(runs[t], "pft")[0]) for t in sorted(runs, key=skey)])]
-    if b.SHRUBS:  # the other variant of the same series, if it has been run
+    pub = b.CFG.get("report", {}).get("publishVariants")
+    if b.SHRUBS and (pub is None or set(pub) >= {"", "_shrubs"}):  # the other variant of the same series, if run and published
         other = {t: seriesDir(rho, friction, not SHRUBS) / runName(t) for t in sorted(runs, key=skey)}
         if all((d / "Outputs/com1DFA/peakFiles").is_dir() for d in other.values()):
             groups.append(dict(name=label(not SHRUBS), runs=[dict(id=lab(t, False), pft=b.peakRaster(d, "pft")[0]) for t, d in other.items()]))
@@ -378,7 +396,7 @@ def plotInteractive(runs, rho, friction, fname, png):
                                  groups=roadGroups(runs, friction, rho))
     pathlib.Path(fname).write_text(PAGE.format(
         title=f"{b.NAME} avalanche: peak flow by release thickness{' (with shrub resistance)' if SHRUBS else ''}", css=css, div=maps, hist=hist, anim=animationHtml(friction),
-        method=methodologyHtml(runs, rho, friction)))
+        observed=observedHtml(), method=methodologyHtml(runs, rho, friction)))
     print("saved", fname, f"({pathlib.Path(fname).stat().st_size / 1e6:.1f} MB)")
 
 
